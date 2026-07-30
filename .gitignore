@@ -1,0 +1,37 @@
+# ─── Java / Maven ───────────────────────────────────────────
+backend/target/
+backend/.mvn/wrapper/maven-wrapper.jar
+*.class
+*.jar
+*.war
+*.ear
+
+# ─── Node / Frontend ────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+
+# ─── Python / AI Service ────────────────────────────────────
+ai-service/__pycache__/
+ai-service/*.pyc
+ai-service/venv/
+ai-service/.venv/
+*.pyc
+__pycache__/
+
+# ─── Uploads (user files, not tracked) ──────────────────────
+backend/uploads/
+
+# ─── IDE / OS ────────────────────────────────────────────────
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+*.swp
+
+# ─── Environment / Secrets ──────────────────────────────────
+.env
+*.env
+application-prod.properties
