@@ -77,9 +77,10 @@ const styles = {
   card: {
     background: '#fff',
     borderRadius: '16px',
-    padding: '48px 40px',
+    padding: '40px 28px',
     width: '100%',
     maxWidth: '400px',
+    margin: '16px',
     boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
   },
   header: { textAlign: 'center', marginBottom: '32px' },

@@ -93,6 +93,7 @@ export default function Materials() {
       )}
 
       <div style={styles.tableCard}>
+        <div className="table-wrap">
         <table style={styles.table}>
           <thead>
             <tr style={styles.thead}>
@@ -124,13 +125,14 @@ export default function Materials() {
           </tbody>
         </table>
         {filtered.length === 0 && <p style={styles.empty}>No materials found.</p>}
+        </div>
       </div>
     </div>
   );
 }
 
 const styles = {
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' },
   title: { margin: 0, color: '#1a1a2e', fontSize: '22px', fontWeight: '700' },
   addBtn: { padding: '10px 20px', background: '#e94560', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' },
   search: { width: '100%', padding: '11px 16px', border: '2px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', marginBottom: '20px', boxSizing: 'border-box' },

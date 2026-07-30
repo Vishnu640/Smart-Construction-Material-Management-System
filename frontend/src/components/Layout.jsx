@@ -4,10 +4,10 @@ import { Outlet } from 'react-router-dom';
 
 export default function Layout() {
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#f0f2f5' }}>
+    <div className="app-layout">
       <Sidebar />
-      <main style={{ marginLeft: '240px', flex: 1, padding: '28px', overflowY: 'auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
+      <main className="main-content">
+        <div className="topbar-right">
           <NotificationBell />
         </div>
         <Outlet />
