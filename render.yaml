@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: smart-construction-api
+    runtime: java
+    rootDir: backend
+    buildCommand: mvn clean package -DskipTests
+    startCommand: java -jar target/management-1.0.0.jar
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_USERNAME
+        sync: false
+      - key: DATABASE_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        value: construction_mgmt_secret_key_2024_very_long_secure_string
+      - key: CORS_ORIGINS
+        value: https://smart-construction-material-management-system-ikno1yzhr.vercel.app
+      - key: PORT
+        value: 8080
