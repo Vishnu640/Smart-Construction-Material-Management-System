@@ -1,30 +1,282 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 
+/* ── 3D Isometric Building Scene ─────────────────────────── */
+function Building3D({ tick }) {
+  const crane = Math.sin(tick * 0.025) * 8;
+  const hookY  = 60 + Math.abs(Math.sin(tick * 0.02)) * 20;
+  const smoke  = [0,1,2].map(i => ({
+    x: 760 + Math.sin(tick * 0.03 + i * 1.2) * 8,
+    y: 80  - (((tick * 0.4 + i * 30) % 60)),
+    r: 4 + i * 3,
+    o: 0.15 - i * 0.04,
+  }));
+
+  /* isometric helpers */
+  const iso = (x, y, z) => ({
+    sx: (x - y) * Math.cos(Math.PI / 6),
+    sy: (x + y) * Math.sin(Math.PI / 6) - z,
+  });
+
+  /* draw one iso box face */
+  const faceTop  = (cx,cy,cz, w,d, fill) => {
+    const a = iso(cx,    cy,    cz);
+    const b = iso(cx+w,  cy,    cz);
+    const c = iso(cx+w,  cy+d,  cz);
+    const e = iso(cx,    cy+d,  cz);
+    return `${a.sx},${a.sy} ${b.sx},${b.sy} ${c.sx},${c.sy} ${e.sx},${e.sy}`;
+  };
+  const faceLeft = (cx,cy,cz, w,h, fill) => {
+    const a = iso(cx,   cy,   cz);
+    const b = iso(cx+w, cy,   cz);
+    const c = iso(cx+w, cy,   cz-h);
+    const e = iso(cx,   cy,   cz-h);
+    return `${a.sx},${a.sy} ${b.sx},${b.sy} ${c.sx},${c.sy} ${e.sx},${e.sy}`;
+  };
+  const faceRight= (cx,cy,cz, d,h) => {
+    const a = iso(cx,   cy,   cz);
+    const b = iso(cx,   cy+d, cz);
+    const c = iso(cx,   cy+d, cz-h);
+    const e = iso(cx,   cy,   cz-h);
+    return `${a.sx},${a.sy} ${b.sx},${b.sy} ${c.sx},${c.sy} ${e.sx},${e.sy}`;
+  };
+
+  /* window grid on a face */
+  const isoWindows = (cx,cy,cz, w,h, cols,rows, axis) => {
+    const wins = [];
+    const ww = w / (cols * 2 + 1);
+    const wh = h / (rows * 2 + 1);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const lit = (r + c + Math.floor(tick*0.005)) % 3 !== 0;
+        const ox = ww + c * ww * 2;
+        const oz = wh + r * wh * 2;
+        let pts;
+        if (axis === 'left') {
+          const a = iso(cx + ox,      cy, cz - oz);
+          const b = iso(cx + ox + ww, cy, cz - oz);
+          const cc= iso(cx + ox + ww, cy, cz - oz - wh);
+          const e = iso(cx + ox,      cy, cz - oz - wh);
+          pts = `${a.sx},${a.sy} ${b.sx},${b.sy} ${cc.sx},${cc.sy} ${e.sx},${e.sy}`;
+        } else {
+          const a = iso(cx, cy + ox,      cz - oz);
+          const b = iso(cx, cy + ox + ww, cz - oz);
+          const cc= iso(cx, cy + ox + ww, cz - oz - wh);
+          const e = iso(cx, cy + ox,      cz - oz - wh);
+          pts = `${a.sx},${a.sy} ${b.sx},${b.sy} ${cc.sx},${cc.sy} ${e.sx},${e.sy}`;
+        }
+        wins.push(<polygon key={`${r}-${c}`} points={pts}
+          fill={lit ? '#ffe066' : '#1a2a3a'} opacity={lit ? 0.9 : 0.6} />);
+      }
+    }
+    return wins;
+  };
+
+  const S = 38; // scale unit
+
+  /* building definitions [cx, cy, cz_base, w, d, h, colorTop, colorLeft, colorRight] */
+  const buildings = [
+    // back-left tall tower
+    [0,   0,  0,  4, 3, 14*S, '#2a4a6b','#1a3a5b','#0f2a4a'],
+    // back-right tower
+    [5,   0,  0,  3, 4, 12*S, '#2a4a6b','#1a3a5b','#0f2a4a'],
+    // mid tower (under construction)
+    [2,   2,  0,  3, 3, 10*S, '#e94560','#c0392b','#a93226'],
+    // front-left medium
+    [0,   4,  0,  3, 2,  7*S, '#2d5a8e','#1e4a7e','#0f3a6e'],
+    // front-right medium
+    [4,   3,  0,  2, 3,  8*S, '#2d5a8e','#1e4a7e','#0f3a6e'],
+    // small front
+    [1,   5,  0,  2, 2,  4*S, '#3a6a9e','#2a5a8e','#1a4a7e'],
+    [5,   5,  0,  2, 2,  5*S, '#3a6a9e','#2a5a8e','#1a4a7e'],
+  ];
+
+  const VB = 900;
+  const cx = VB / 2 - 20, cy = VB * 0.62;
+
+  return (
+    <svg
+      viewBox={`0 0 ${VB} ${VB}`}
+      style={{ position:'absolute', inset:0, width:'100%', height:'100%' }}
+      preserveAspectRatio="xMidYMid slice"
+    >
+      <defs>
+        <radialGradient id="bgGrad" cx="50%" cy="40%" r="70%">
+          <stop offset="0%"   stopColor="#0f2a4a"/>
+          <stop offset="60%"  stopColor="#0a1a2e"/>
+          <stop offset="100%" stopColor="#050d18"/>
+        </radialGradient>
+        <radialGradient id="glow1" cx="50%" cy="50%" r="50%">
+          <stop offset="0%"  stopColor="#e94560" stopOpacity="0.3"/>
+          <stop offset="100%" stopColor="#e94560" stopOpacity="0"/>
+        </radialGradient>
+        <radialGradient id="glow2" cx="50%" cy="50%" r="50%">
+          <stop offset="0%"  stopColor="#3182ce" stopOpacity="0.2"/>
+          <stop offset="100%" stopColor="#3182ce" stopOpacity="0"/>
+        </radialGradient>
+        <filter id="blur4"><feGaussianBlur stdDeviation="4"/></filter>
+        <filter id="blur8"><feGaussianBlur stdDeviation="8"/></filter>
+        <filter id="blur2"><feGaussianBlur stdDeviation="2"/></filter>
+      </defs>
+
+      {/* sky */}
+      <rect width={VB} height={VB} fill="url(#bgGrad)"/>
+
+      {/* stars */}
+      {Array.from({length:60},(_,i)=>{
+        const sx = (i*137.5)%VB;
+        const sy = (i*97.3)%(VB*0.55);
+        const sr = 0.5 + (i%3)*0.5;
+        const so = 0.3 + (i%4)*0.15;
+        return <circle key={i} cx={sx} cy={sy} r={sr} fill="white" opacity={so}/>;
+      })}
+
+      {/* moon */}
+      <circle cx="780" cy="80" r="45" fill="#f0e68c" opacity="0.12" filter="url(#blur4)"/>
+      <circle cx="780" cy="80" r="32" fill="#f0e68c" opacity="0.18"/>
+      <circle cx="793" cy="72" r="26" fill="#0a1a2e"/>
+
+      {/* ambient glow behind buildings */}
+      <ellipse cx={cx} cy={cy+40} rx="320" ry="80" fill="url(#glow2)" filter="url(#blur8)"/>
+
+      {/* ground plane */}
+      <g transform={`translate(${cx},${cy})`}>
+        {/* ground tiles */}
+        {[-3,-2,-1,0,1,2,3].map(gx =>
+          [-2,-1,0,1,2].map(gy => {
+            const a = iso(gx*S,   gy*S,   0);
+            const b = iso(gx*S+S, gy*S,   0);
+            const c = iso(gx*S+S, gy*S+S, 0);
+            const e = iso(gx*S,   gy*S+S, 0);
+            const shade = (gx+gy)%2===0 ? '#0d2035' : '#0a1828';
+            return <polygon key={`${gx}-${gy}`}
+              points={`${a.sx},${a.sy} ${b.sx},${b.sy} ${c.sx},${c.sy} ${e.sx},${e.sy}`}
+              fill={shade} stroke="#0f2540" strokeWidth="0.5"/>;
+          })
+        )}
+
+        {/* road lines */}
+        {[-2,-1,0,1,2].map(i => {
+          const a = iso(-3*S, i*S+S*0.45, 1);
+          const b = iso( 3*S, i*S+S*0.45, 1);
+          return <line key={i} x1={a.sx} y1={a.sy} x2={b.sx} y2={b.sy}
+            stroke="#f6c90e" strokeWidth="0.8" opacity="0.15" strokeDasharray="8,12"/>;
+        })}
+
+        {/* BUILDINGS */}
+        {buildings.map(([bx,by,bz,w,d,h,cTop,cLeft,cRight],bi) => {
+          const bxs = (bx-3)*S, bys = (by-2)*S;
+          return (
+            <g key={bi}>
+              {/* right face */}
+              <polygon points={faceRight(bxs,bys,bz,d*S,h)} fill={cRight} stroke="#000" strokeWidth="0.3"/>
+              {/* left face */}
+              <polygon points={faceLeft(bxs,bys,bz,w*S,h)} fill={cLeft} stroke="#000" strokeWidth="0.3"/>
+              {/* top face */}
+              <polygon points={faceTop(bxs,bys,bz-h,w*S,d*S)} fill={cTop} stroke="#000" strokeWidth="0.3"/>
+              {/* windows left */}
+              {isoWindows(bxs,bys,bz, w*S,h, Math.max(1,w), Math.max(2,Math.floor(h/S/2)), 'left')}
+              {/* windows right */}
+              {isoWindows(bxs,bys+d*S,bz, d*S,h, Math.max(1,d), Math.max(2,Math.floor(h/S/2)), 'right')}
+              {/* rooftop glow on tall buildings */}
+              {h > 8*S && (() => {
+                const top = iso(bxs+w*S/2, bys+d*S/2, bz-h-4);
+                return <circle cx={top.sx} cy={top.sy} r="6"
+                  fill="#e94560" opacity={0.6+Math.sin(tick*0.05+bi)*0.3} filter="url(#blur2)"/>;
+              })()}
+            </g>
+          );
+        })}
+
+        {/* CRANE on mid tower */}
+        {(() => {
+          const base = iso(-1*S, 0*S, 0);
+          const top  = iso(-1*S, 0*S, 10*S);
+          const jibR = iso(-1*S + 4*S*Math.cos(crane*Math.PI/180), 0*S + 4*S*Math.sin(crane*Math.PI/180), 10*S);
+          const jibL = iso(-1*S - 2*S*Math.cos(crane*Math.PI/180), 0*S - 2*S*Math.sin(crane*Math.PI/180), 10*S);
+          const hook = iso(-1*S + 3.5*S*Math.cos(crane*Math.PI/180), 0*S + 3.5*S*Math.sin(crane*Math.PI/180), 10*S - hookY);
+          return (
+            <g>
+              <line x1={base.sx} y1={base.sy} x2={top.sx} y2={top.sy} stroke="#e94560" strokeWidth="3"/>
+              <line x1={jibL.sx} y1={jibL.sy} x2={jibR.sx} y2={jibR.sy} stroke="#e94560" strokeWidth="2.5"/>
+              <line x1={top.sx} y1={top.sy} x2={hook.sx} y2={hook.sy} stroke="#f6c90e" strokeWidth="1.2"/>
+              <rect x={hook.sx-5} y={hook.sy-4} width="10" height="8" fill="#aaa" rx="2"/>
+              <circle cx={top.sx} cy={top.sy} r="5" fill="#e94560"/>
+            </g>
+          );
+        })()}
+
+        {/* CONSTRUCTION TRUCK */}
+        {(() => {
+          const tx = -3*S + ((tick*0.3)%(7*S));
+          const tp = iso(tx, 2*S, 2);
+          return (
+            <g transform={`translate(${tp.sx},${tp.sy})`}>
+              <rect x="-18" y="-10" width="36" height="14" fill="#e94560" rx="2"/>
+              <rect x="10"  y="-16" width="14" height="12" fill="#c0392b" rx="1"/>
+              <circle cx="-10" cy="6" r="5" fill="#222"/>
+              <circle cx="-10" cy="6" r="3" fill="#555"/>
+              <circle cx="12"  cy="6" r="5" fill="#222"/>
+              <circle cx="12"  cy="6" r="3" fill="#555"/>
+              <rect x="11" y="-14" width="11" height="8" fill="#87ceeb" opacity="0.5" rx="1"/>
+            </g>
+          );
+        })()}
+
+        {/* SMOKE from crane area */}
+        {smoke.map((p,i) => {
+          const sp = iso(-1*S, 0*S, 10*S + p.y);
+          return <circle key={i} cx={sp.sx + p.x - VB/2 + cx} cy={sp.sy} r={p.r}
+            fill="white" opacity={p.o} filter="url(#blur2)"/>;
+        })}
+
+        {/* WORKERS */}
+        {[[-2*S,3*S],[ 0*S,4*S],[2*S,2*S]].map(([wx,wy],i) => {
+          const wp = iso(wx, wy, 2);
+          return (
+            <g key={i} transform={`translate(${wp.sx},${wp.sy})`}>
+              <circle cx="0" cy="-12" r="4" fill="#f4a261"/>
+              <rect x="-2" y="-14" width="8" height="4" fill="#f6c90e" rx="2"/>
+              <rect x="-3" y="-8"  width="6" height="10" fill="#1e3a5f"/>
+            </g>
+          );
+        })}
+      </g>
+
+      {/* top glow overlay */}
+      <ellipse cx={cx} cy={cy-180} rx="200" ry="120" fill="url(#glow1)" filter="url(#blur8)" opacity="0.5"/>
+
+      {/* grid overlay */}
+      <rect width={VB} height={VB} fill="none"
+        style={{backgroundImage:'linear-gradient(rgba(255,255,255,0.015) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.015) 1px,transparent 1px)',
+        backgroundSize:'60px 60px'}}/>
+
+      {/* vignette */}
+      <radialGradient id="vig" cx="50%" cy="50%" r="70%">
+        <stop offset="0%"   stopColor="transparent"/>
+        <stop offset="100%" stopColor="rgba(0,0,0,0.55)"/>
+      </radialGradient>
+      <rect width={VB} height={VB} fill="url(#vig)"/>
+    </svg>
+  );
+}
+
+/* ── Login Component ─────────────────────────────────────── */
 export default function Login() {
-  const [form, setForm] = useState({ username: '', password: '' });
+  const [form, setForm]       = useState({ username: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
-  const [tick, setTick] = useState(0);
-  const { login } = useAuth();
-  const navigate = useNavigate();
+  const [tick, setTick]       = useState(0);
+  const { login }  = useAuth();
+  const navigate   = useNavigate();
 
-  // animate crane arm & particles
   useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 50);
+    const id = setInterval(() => setTick(t => t + 1), 40);
     return () => clearInterval(id);
   }, []);
-
-  const craneAngle = Math.sin(tick * 0.03) * 6;
-  const particles = Array.from({ length: 8 }, (_, i) => ({
-    x: 60 + Math.sin((tick * 0.02) + i * 0.8) * 18,
-    y: 30 + Math.cos((tick * 0.015) + i * 1.1) * 12,
-    r: 2 + (i % 3),
-    op: 0.3 + Math.abs(Math.sin(tick * 0.04 + i)) * 0.5,
-  }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -43,250 +295,45 @@ export default function Login() {
 
   return (
     <div style={s.page}>
-      {/* ── LEFT PANEL ── */}
-      <div style={s.left}>
-        {/* animated background grid */}
-        <svg style={s.bgGrid} viewBox="0 0 400 600" preserveAspectRatio="xMidYMid slice">
-          <defs>
-            <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1"/>
-            </pattern>
-          </defs>
-          <rect width="400" height="600" fill="url(#grid)" />
-        </svg>
+      {/* full-screen 3D background */}
+      <Building3D tick={tick} />
 
-        {/* floating particles */}
-        <svg style={s.particles} viewBox="0 0 120 80">
-          {particles.map((p, i) => (
-            <circle key={i} cx={p.x} cy={p.y} r={p.r} fill="#f6c90e" opacity={p.op} />
-          ))}
-        </svg>
+      {/* dark overlay for readability */}
+      <div style={s.overlay}/>
 
-        {/* main civil engineering SVG illustration */}
-        <svg style={s.illustration} viewBox="0 0 420 480" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#0f3460" />
-              <stop offset="100%" stopColor="#16213e" />
-            </linearGradient>
-            <linearGradient id="bldg1" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#1e3a5f" />
-              <stop offset="100%" stopColor="#0d2137" />
-            </linearGradient>
-            <linearGradient id="bldg2" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#243b55" />
-              <stop offset="100%" stopColor="#141e30" />
-            </linearGradient>
-            <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#2d4a22" />
-              <stop offset="100%" stopColor="#1a2e14" />
-            </linearGradient>
-            <filter id="glow">
-              <feGaussianBlur stdDeviation="2" result="blur"/>
-              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-            </filter>
-          </defs>
-
-          {/* sky */}
-          <rect width="420" height="480" fill="url(#sky)" />
-
-          {/* stars */}
-          {[{x:30,y:20},{x:80,y:35},{x:150,y:15},{x:220,y:28},{x:300,y:18},{x:370,y:40},{x:50,y:60},{x:340,y:55}].map((st,i)=>(
-            <circle key={i} cx={st.x} cy={st.y} r="1.5" fill="white" opacity="0.6"/>
-          ))}
-
-          {/* moon */}
-          <circle cx="370" cy="45" r="22" fill="#f0e68c" opacity="0.15"/>
-          <circle cx="378" cy="40" r="18" fill="#16213e" opacity="0.9"/>
-
-          {/* background buildings */}
-          <rect x="0" y="200" width="60" height="280" fill="#0d1b2a" opacity="0.7"/>
-          <rect x="360" y="180" width="60" height="300" fill="#0d1b2a" opacity="0.7"/>
-          {/* bg windows */}
-          {[210,230,250,270,290,310].map((y,i)=>(
-            <rect key={i} x="10" y={y} width="8" height="6" fill="#f6c90e" opacity="0.3"/>
-          ))}
-          {[190,210,230,250,270,290].map((y,i)=>(
-            <rect key={i} x="370" y={y} width="8" height="6" fill="#f6c90e" opacity="0.3"/>
-          ))}
-
-          {/* main building left */}
-          <rect x="30" y="150" width="110" height="330" fill="url(#bldg1)" rx="2"/>
-          <rect x="30" y="150" width="110" height="4" fill="#e94560" opacity="0.8"/>
-          {/* windows left building */}
-          {[165,190,215,240,265,290,315,340,365,390].map((y,i)=>(
-            [40,65,90,105].map((x,j)=>(
-              <rect key={`${i}-${j}`} x={x} y={y} width="14" height="16"
-                fill={Math.random()>0.3?"#f6c90e":"#1a3a5c"} opacity="0.7" rx="1"/>
-            ))
-          ))}
-
-          {/* main building right */}
-          <rect x="280" y="120" width="120" height="360" fill="url(#bldg2)" rx="2"/>
-          <rect x="280" y="120" width="120" height="4" fill="#e94560" opacity="0.8"/>
-          {/* windows right building */}
-          {[135,160,185,210,235,260,285,310,335,360,385].map((y,i)=>(
-            [290,315,340,365,385].map((x,j)=>(
-              <rect key={`${i}-${j}`} x={x} y={y} width="14" height="16"
-                fill={Math.random()>0.4?"#f6c90e":"#1a3a5c"} opacity="0.7" rx="1"/>
-            ))
-          ))}
-
-          {/* center tower under construction */}
-          <rect x="155" y="220" width="110" height="260" fill="#1e3a5f" rx="2"/>
-          <rect x="155" y="220" width="110" height="5" fill="#e94560"/>
-          {/* scaffolding */}
-          {[220,250,280,310,340,370,400].map((y,i)=>(
-            <line key={i} x1="155" y1={y} x2="265" y2={y} stroke="#f6c90e" strokeWidth="1.5" opacity="0.5"/>
-          ))}
-          {[165,185,205,225,245].map((x,i)=>(
-            <line key={i} x1={x} y1="220" x2={x} y2="480" stroke="#f6c90e" strokeWidth="1" opacity="0.4"/>
-          ))}
-          {/* center windows */}
-          {[235,265,295,325,355,385].map((y,i)=>(
-            [165,195,225].map((x,j)=>(
-              <rect key={`${i}-${j}`} x={x} y={y} width="18" height="20"
-                fill={i%2===0?"#f6c90e":"#1a3a5c"} opacity="0.8" rx="1"/>
-            ))
-          ))}
-
-          {/* CRANE */}
-          <g transform={`translate(210, 220) rotate(${craneAngle}, 0, 0)`}>
-            {/* mast */}
-            <rect x="-5" y="-200" width="10" height="200" fill="#e94560" rx="2"/>
-            {/* horizontal jib */}
-            <rect x="-10" y="-200" width="120" height="8" fill="#e94560" rx="2"/>
-            {/* counter jib */}
-            <rect x="-60" y="-200" width="55" height="8" fill="#c0392b" rx="2"/>
-            {/* cables */}
-            <line x1="0" y1="-192" x2="80" y2="-192" stroke="#f6c90e" strokeWidth="1.5"/>
-            <line x1="80" y1="-192" x2="80" y2="-155" stroke="#f6c90e" strokeWidth="1.5"/>
-            {/* hook */}
-            <rect x="74" y="-158" width="12" height="10" fill="#aaa" rx="2"/>
-            {/* counterweight */}
-            <rect x="-58" y="-196" width="30" height="16" fill="#888" rx="2"/>
-            {/* mast stripes */}
-            {[-180,-160,-140,-120,-100,-80,-60,-40,-20].map((y,i)=>(
-              <rect key={i} x="-5" y={y} width="10" height="6" fill="#fff" opacity="0.2"/>
-            ))}
-          </g>
-
-          {/* ground / road */}
-          <rect x="0" y="440" width="420" height="40" fill="url(#ground)"/>
-          <rect x="0" y="440" width="420" height="3" fill="#f6c90e" opacity="0.6"/>
-          {/* road markings */}
-          {[20,60,100,140,180,220,260,300,340,380].map((x,i)=>(
-            <rect key={i} x={x} y="455" width="25" height="4" fill="white" opacity="0.3" rx="2"/>
-          ))}
-
-          {/* construction truck */}
-          <g transform="translate(50, 415)">
-            <rect x="0" y="10" width="70" height="22" fill="#e94560" rx="3"/>
-            <rect x="45" y="2" width="28" height="20" fill="#c0392b" rx="2"/>
-            <circle cx="15" cy="34" r="7" fill="#333"/>
-            <circle cx="15" cy="34" r="4" fill="#666"/>
-            <circle cx="55" cy="34" r="7" fill="#333"/>
-            <circle cx="55" cy="34" r="4" fill="#666"/>
-            <rect x="48" y="5" width="22" height="14" fill="#87ceeb" opacity="0.6" rx="1"/>
-          </g>
-
-          {/* cement mixer */}
-          <g transform="translate(300, 410)">
-            <rect x="0" y="15" width="65" height="20" fill="#f6c90e" rx="3"/>
-            <ellipse cx="42" cy="18" rx="18" ry="14" fill="#e0a800"/>
-            <ellipse cx="42" cy="18" rx="10" ry="8" fill="#c8960c"/>
-            <circle cx="12" cy="37" r="6" fill="#333"/>
-            <circle cx="52" cy="37" r="6" fill="#333"/>
-          </g>
-
-          {/* hard hat worker */}
-          <g transform="translate(195, 400)">
-            <circle cx="12" cy="0" r="8" fill="#f4a261"/>
-            <rect x="5" y="-2" width="14" height="6" fill="#f6c90e" rx="3"/>
-            <rect x="7" y="8" width="10" height="18" fill="#1e3a5f"/>
-            <line x1="7" y1="14" x2="0" y2="24" stroke="#f4a261" strokeWidth="3"/>
-            <line x1="17" y1="14" x2="24" y2="24" stroke="#f4a261" strokeWidth="3"/>
-          </g>
-
-          {/* blueprint roll */}
-          <g transform="translate(240, 405)">
-            <rect x="0" y="0" width="30" height="22" fill="#1a6b9a" rx="2" opacity="0.9"/>
-            <line x1="5" y1="6" x2="25" y2="6" stroke="white" strokeWidth="1" opacity="0.6"/>
-            <line x1="5" y1="11" x2="25" y2="11" stroke="white" strokeWidth="1" opacity="0.6"/>
-            <line x1="5" y1="16" x2="18" y2="16" stroke="white" strokeWidth="1" opacity="0.6"/>
-            <rect x="-3" y="-2" width="6" height="26" fill="#0d4f73" rx="3"/>
-            <rect x="27" y="-2" width="6" height="26" fill="#0d4f73" rx="3"/>
-          </g>
-
-          {/* dust/smoke particles near construction */}
-          {[{x:170,y:215},{x:185,y:210},{x:200,y:218},{x:260,y:212}].map((p,i)=>(
-            <circle key={i} cx={p.x} cy={p.y + Math.sin(tick*0.05+i)*4} r="6"
-              fill="white" opacity={0.04 + Math.abs(Math.sin(tick*0.03+i))*0.06}/>
-          ))}
-
-          {/* top label */}
-          <text x="210" y="95" textAnchor="middle" fill="white" fontSize="13"
-            fontFamily="Arial" fontWeight="bold" opacity="0.5" letterSpacing="4">
-            UNDER CONSTRUCTION
-          </text>
-          <line x1="80" y1="100" x2="155" y2="100" stroke="#e94560" strokeWidth="1" opacity="0.5"/>
-          <line x1="265" y1="100" x2="340" y2="100" stroke="#e94560" strokeWidth="1" opacity="0.5"/>
-        </svg>
-
-        {/* left panel text */}
-        <div style={s.leftText}>
-          <div style={s.badge}>🏗️ CIVIL ENGINEERING PLATFORM</div>
-          <h2 style={s.leftTitle}>CivilMatrix</h2>
-          <p style={s.leftSub}>Smart Construction Material Management</p>
-          <div style={s.features}>
-            {['📦 Real-time Stock Tracking','📊 Project Analytics','🤖 AI Demand Prediction','📄 PDF Reports'].map(f => (
-              <div key={f} style={s.featureItem}>
-                <span style={s.featureDot}/>
-                {f}
-              </div>
-            ))}
-          </div>
+      {/* centered login card */}
+      <div style={s.center}>
+        {/* brand strip above card */}
+        <div style={s.brand}>
+          <span style={s.brandIcon}>🏗️</span>
+          <span style={s.brandName}>CivilMatrix</span>
+          <span style={s.brandTag}>Smart Construction Platform</span>
         </div>
-      </div>
 
-      {/* ── RIGHT PANEL ── */}
-      <div style={s.right}>
         <div style={s.card}>
-          <div style={s.cardHeader}>
-            <div style={s.logoCircle}>🏗️</div>
-            <h1 style={s.cardTitle}>Welcome Back</h1>
-            <p style={s.cardSub}>Sign in to CivilMatrix</p>
-          </div>
+          <h1 style={s.cardTitle}>Welcome Back</h1>
+          <p style={s.cardSub}>Sign in to continue</p>
 
           <form onSubmit={handleSubmit} style={s.form}>
             <div style={s.field}>
               <label style={s.label}>Username</label>
               <div style={s.inputWrap}>
-                <span style={s.inputIcon}>👤</span>
-                <input
-                  style={s.input}
-                  type="text"
-                  placeholder="Enter your username"
+                <span style={s.iIcon}>👤</span>
+                <input style={s.input} type="text" placeholder="Enter username"
                   value={form.username}
-                  onChange={e => setForm({ ...form, username: e.target.value })}
-                  required
-                />
+                  onChange={e => setForm({ ...form, username: e.target.value })} required/>
               </div>
             </div>
 
             <div style={s.field}>
               <label style={s.label}>Password</label>
               <div style={s.inputWrap}>
-                <span style={s.inputIcon}>🔒</span>
-                <input
-                  style={s.input}
-                  type={showPass ? 'text' : 'password'}
-                  placeholder="Enter your password"
+                <span style={s.iIcon}>🔒</span>
+                <input style={s.input} type={showPass ? 'text' : 'password'}
+                  placeholder="Enter password"
                   value={form.password}
-                  onChange={e => setForm({ ...form, password: e.target.value })}
-                  required
-                />
-                <span style={s.eyeBtn} onClick={() => setShowPass(v => !v)}>
+                  onChange={e => setForm({ ...form, password: e.target.value })} required/>
+                <span style={s.eye} onClick={() => setShowPass(v => !v)}>
                   {showPass ? '🙈' : '👁️'}
                 </span>
               </div>
@@ -294,29 +341,28 @@ export default function Login() {
 
             <button style={{ ...s.btn, opacity: loading ? 0.8 : 1 }} type="submit" disabled={loading}>
               {loading
-                ? <span style={s.btnInner}><span style={s.spinner}/> Signing in...</span>
-                : <span style={s.btnInner}>🚀 Sign In</span>
-              }
+                ? <><span style={s.spinner}/> Signing in...</>
+                : <>🚀 Sign In</>}
             </button>
           </form>
 
-          <div style={s.divider}><span style={s.dividerText}>Quick Access</span></div>
+          <div style={s.divLine}><span style={s.divTxt}>Quick Access</span></div>
 
           <div style={s.roles}>
             {[
-              { role: 'Admin', user: 'admin', pass: 'admin123', color: '#e94560', icon: '👑' },
-              { role: 'Engineer', user: 'engineer', pass: 'engineer123', color: '#3182ce', icon: '⚙️' },
-              { role: 'Store Mgr', user: 'storemanager', pass: 'store123', color: '#38a169', icon: '🏪' },
+              { label:'Admin',     user:'admin',        pass:'admin123',    color:'#e94560', icon:'👑' },
+              { label:'Engineer',  user:'engineer',     pass:'engineer123', color:'#3182ce', icon:'⚙️' },
+              { label:'Store Mgr',user:'storemanager', pass:'store123',    color:'#38a169', icon:'🏪' },
             ].map(r => (
-              <button key={r.role} style={{ ...s.roleBtn, borderColor: r.color, color: r.color }}
+              <button key={r.label}
+                style={{ ...s.roleBtn, borderColor: r.color, color: r.color }}
                 onClick={() => setForm({ username: r.user, password: r.pass })}>
-                <span>{r.icon}</span>
-                <span style={{ fontSize: '11px', fontWeight: 600 }}>{r.role}</span>
+                <span style={{ fontSize:18 }}>{r.icon}</span>
+                <span style={{ fontSize:10, fontWeight:700 }}>{r.label}</span>
               </button>
             ))}
           </div>
-
-          <p style={s.hint}>Click a role above to auto-fill credentials</p>
+          <p style={s.hint}>Click a role to auto-fill credentials</p>
         </div>
       </div>
     </div>
@@ -326,140 +372,97 @@ export default function Login() {
 const s = {
   page: {
     minHeight: '100vh',
-    display: 'flex',
-    background: '#0f1923',
-  },
-  // LEFT
-  left: {
-    flex: 1,
-    background: 'linear-gradient(160deg, #0f3460 0%, #16213e 50%, #1a1a2e 100%)',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
     position: 'relative',
-    overflow: 'hidden',
-    padding: '40px 30px',
-    '@media(maxWidth:768px)': { display: 'none' },
-  },
-  bgGrid: {
-    position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-    pointerEvents: 'none',
-  },
-  particles: {
-    position: 'absolute', top: '5%', right: '5%', width: '120px', height: '80px',
-    pointerEvents: 'none',
-  },
-  illustration: {
-    width: '100%', maxWidth: '420px', height: 'auto', position: 'relative', zIndex: 1,
-  },
-  leftText: {
-    position: 'relative', zIndex: 2, textAlign: 'center', marginTop: '20px',
-  },
-  badge: {
-    display: 'inline-block',
-    background: 'rgba(233,69,96,0.2)',
-    border: '1px solid rgba(233,69,96,0.5)',
-    color: '#e94560',
-    fontSize: '10px',
-    fontWeight: '700',
-    letterSpacing: '2px',
-    padding: '5px 14px',
-    borderRadius: '20px',
-    marginBottom: '12px',
-  },
-  leftTitle: {
-    color: '#fff', fontSize: '32px', fontWeight: '800', margin: '0 0 6px',
-    textShadow: '0 0 30px rgba(233,69,96,0.4)',
-  },
-  leftSub: {
-    color: 'rgba(255,255,255,0.5)', fontSize: '13px', margin: '0 0 20px',
-  },
-  features: {
-    display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-start',
-    display: 'inline-flex',
-  },
-  featureItem: {
-    display: 'flex', alignItems: 'center', gap: '8px',
-    color: 'rgba(255,255,255,0.7)', fontSize: '13px',
-  },
-  featureDot: {
-    width: '6px', height: '6px', borderRadius: '50%',
-    background: '#e94560', flexShrink: 0,
-  },
-  // RIGHT
-  right: {
-    width: '420px',
-    minWidth: '320px',
-    background: '#fff',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '30px 20px',
+    overflow: 'hidden',
+    background: '#050d18',
+  },
+  overlay: {
+    position: 'absolute', inset: 0,
+    background: 'linear-gradient(135deg,rgba(5,13,24,0.45) 0%,rgba(10,26,46,0.35) 100%)',
+    zIndex: 1,
+  },
+  center: {
+    position: 'relative', zIndex: 2,
+    display: 'flex', flexDirection: 'column', alignItems: 'center',
+    width: '100%', maxWidth: '420px',
+    padding: '16px',
+  },
+  brand: {
+    display: 'flex', alignItems: 'center', gap: '10px',
+    marginBottom: '16px',
+  },
+  brandIcon: { fontSize: '32px', filter: 'drop-shadow(0 0 12px rgba(233,69,96,0.7))' },
+  brandName: {
+    color: '#fff', fontSize: '26px', fontWeight: '800',
+    textShadow: '0 0 20px rgba(233,69,96,0.5)',
+    letterSpacing: '-0.5px',
+  },
+  brandTag: {
+    color: 'rgba(255,255,255,0.45)', fontSize: '11px',
+    borderLeft: '1px solid rgba(255,255,255,0.2)',
+    paddingLeft: '10px', lineHeight: '1.3',
   },
   card: {
-    width: '100%', maxWidth: '360px',
+    width: '100%',
+    background: 'rgba(255,255,255,0.97)',
+    borderRadius: '20px',
+    padding: '32px 28px 24px',
+    boxShadow: '0 25px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.1)',
+    backdropFilter: 'blur(20px)',
   },
-  cardHeader: { textAlign: 'center', marginBottom: '28px' },
-  logoCircle: {
-    fontSize: '44px',
-    display: 'block',
-    marginBottom: '10px',
-    filter: 'drop-shadow(0 4px 12px rgba(233,69,96,0.3))',
-  },
-  cardTitle: {
-    margin: '0 0 4px', color: '#1a1a2e', fontSize: '24px', fontWeight: '800',
-  },
-  cardSub: { color: '#718096', fontSize: '13px', margin: 0 },
-  form: { display: 'flex', flexDirection: 'column', gap: '18px' },
-  field: { display: 'flex', flexDirection: 'column', gap: '6px' },
-  label: { fontSize: '12px', fontWeight: '700', color: '#4a5568', textTransform: 'uppercase', letterSpacing: '0.5px' },
+  cardTitle: { margin: '0 0 4px', color: '#1a1a2e', fontSize: '22px', fontWeight: '800', textAlign:'center' },
+  cardSub:   { color: '#718096', fontSize: '13px', margin: '0 0 24px', textAlign:'center' },
+  form:  { display: 'flex', flexDirection: 'column', gap: '16px' },
+  field: { display: 'flex', flexDirection: 'column', gap: '5px' },
+  label: { fontSize: '11px', fontWeight: '700', color: '#4a5568', textTransform: 'uppercase', letterSpacing: '0.6px' },
   inputWrap: {
     display: 'flex', alignItems: 'center',
     border: '2px solid #e2e8f0', borderRadius: '10px',
-    overflow: 'hidden', background: '#f8fafc',
-    transition: 'border-color 0.2s',
+    background: '#f8fafc', overflow: 'hidden',
   },
-  inputIcon: { padding: '0 10px', fontSize: '16px', userSelect: 'none' },
+  iIcon: { padding: '0 10px', fontSize: '15px', userSelect: 'none' },
   input: {
-    flex: 1, padding: '12px 8px', border: 'none', background: 'transparent',
+    flex: 1, padding: '11px 6px', border: 'none', background: 'transparent',
     fontSize: '14px', outline: 'none', color: '#2d3748',
   },
-  eyeBtn: {
-    padding: '0 12px', cursor: 'pointer', fontSize: '16px', userSelect: 'none',
-  },
+  eye: { padding: '0 12px', cursor: 'pointer', fontSize: '15px', userSelect: 'none' },
   btn: {
-    padding: '14px',
-    background: 'linear-gradient(135deg, #e94560 0%, #c0392b 100%)',
+    padding: '13px',
+    background: 'linear-gradient(135deg,#e94560,#c0392b)',
     color: '#fff', border: 'none', borderRadius: '10px',
     fontSize: '15px', fontWeight: '700', cursor: 'pointer',
-    boxShadow: '0 4px 20px rgba(233,69,96,0.4)',
-    transition: 'transform 0.1s',
+    boxShadow: '0 4px 20px rgba(233,69,96,0.45)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
     marginTop: '4px',
   },
-  btnInner: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' },
   spinner: {
-    width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.3)',
-    borderTop: '2px solid white', borderRadius: '50%',
-    animation: 'spin 0.8s linear infinite', display: 'inline-block',
+    width: '14px', height: '14px',
+    border: '2px solid rgba(255,255,255,0.3)',
+    borderTop: '2px solid #fff',
+    borderRadius: '50%',
+    animation: 'spin 0.8s linear infinite',
+    display: 'inline-block',
   },
-  divider: {
-    display: 'flex', alignItems: 'center', gap: '10px',
-    margin: '22px 0 14px',
+  divLine: {
+    display: 'flex', alignItems: 'center',
+    margin: '20px 0 12px',
+    gap: '10px',
   },
-  dividerText: {
+  divTxt: {
+    flex: 1, textAlign: 'center',
     color: '#a0aec0', fontSize: '11px', fontWeight: '600',
     textTransform: 'uppercase', letterSpacing: '1px',
-    background: '#fff', padding: '0 8px', whiteSpace: 'nowrap',
-    flex: 1, textAlign: 'center',
     borderTop: '1px solid #e2e8f0',
   },
-  roles: { display: 'flex', gap: '8px', justifyContent: 'center' },
+  roles: { display: 'flex', gap: '8px' },
   roleBtn: {
-    flex: 1, padding: '10px 6px', background: '#fff',
-    border: '2px solid', borderRadius: '10px', cursor: 'pointer',
-    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
-    fontSize: '18px', transition: 'background 0.2s',
+    flex: 1, padding: '9px 4px',
+    background: '#fff', border: '2px solid', borderRadius: '10px',
+    cursor: 'pointer', display: 'flex', flexDirection: 'column',
+    alignItems: 'center', gap: '3px',
   },
-  hint: { textAlign: 'center', color: '#a0aec0', fontSize: '11px', marginTop: '14px' },
+  hint: { textAlign: 'center', color: '#a0aec0', fontSize: '11px', marginTop: '12px' },
 };
