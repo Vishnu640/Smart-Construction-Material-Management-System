@@ -28,7 +28,7 @@ export default function Sidebar() {
       {/* Mobile top bar */}
       <div className="mobile-topbar">
         <button className="hamburger" onClick={() => setOpen(true)}>☰</button>
-        <span className="mobile-logo">🏗️ ConstructPro</span>
+        <span className="mobile-logo">🏗️ CivilMatrix</span>
         <div style={{ width: 40 }} />
       </div>
 
@@ -40,7 +40,7 @@ export default function Sidebar() {
         <div className="sidebar-header">
           <div className="logo">
             <span style={{ fontSize: 26 }}>🏗️</span>
-            <span className="logo-text">ConstructPro</span>
+            <span className="logo-text">CivilMatrix</span>
           </div>
           <button className="close-btn" onClick={() => setOpen(false)}>✕</button>
         </div>

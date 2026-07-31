@@ -30,7 +30,7 @@ export default function Login() {
       <div style={styles.card}>
         <div style={styles.header}>
           <span style={styles.icon}>🏗️</span>
-          <h1 style={styles.title}>ConstructPro</h1>
+          <h1 style={styles.title}>CivilMatrix</h1>
           <p style={styles.subtitle}>Smart Material Management System</p>
         </div>
         <form onSubmit={handleSubmit} style={styles.form}>
