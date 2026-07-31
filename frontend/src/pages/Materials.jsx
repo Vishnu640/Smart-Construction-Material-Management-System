@@ -3,7 +3,7 @@ import api from '../services/api';
 import toast from 'react-hot-toast';
 import PdfDownloadButton from '../components/PdfDownloadButton';
 
-const empty = { materialName: '', category: '', quantity: '', price: '', supplier: '' };
+const empty = { materialName: '', category: '', quantity: '', price: '', supplier: '', minStock: '100' };
 
 export default function Materials() {
   const [materials, setMaterials] = useState([]);
@@ -30,7 +30,7 @@ export default function Materials() {
   };
 
   const handleEdit = (m) => {
-    setForm({ materialName: m.materialName, category: m.category, quantity: m.quantity, price: m.price, supplier: m.supplier });
+    setForm({ materialName: m.materialName, category: m.category, quantity: m.quantity, price: m.price, supplier: m.supplier, minStock: m.minStock ?? 100 });
     setEditId(m.materialId); setShowForm(true);
   };
 
@@ -70,8 +70,9 @@ export default function Materials() {
               { key: 'materialName', label: 'Material Name', type: 'text' },
               { key: 'category', label: 'Category', type: 'text' },
               { key: 'quantity', label: 'Quantity', type: 'number' },
-              { key: 'price', label: 'Price ($)', type: 'number' },
+              { key: 'price', label: 'Price (₹)', type: 'number' },
               { key: 'supplier', label: 'Supplier', type: 'text' },
+              { key: 'minStock', label: 'Min Stock', type: 'number' },
             ].map(f => (
               <div key={f.key} style={styles.field}>
                 <label style={styles.label}>{f.label}</label>
@@ -109,11 +110,11 @@ export default function Materials() {
                 <td style={{ ...styles.td, fontWeight: '600' }}>{m.materialName}</td>
                 <td style={styles.td}><span style={styles.badge}>{m.category}</span></td>
                 <td style={styles.td}>{m.quantity}</td>
-                <td style={styles.td}>${m.price}</td>
+                <td style={styles.td}>₹{m.price}</td>
                 <td style={styles.td}>{m.supplier}</td>
                 <td style={styles.td}>
-                  <span style={m.quantity < 100 ? styles.lowStock : styles.inStock}>
-                    {m.quantity < 100 ? '⚠️ Low' : '✅ OK'}
+                  <span style={m.quantity < (m.minStock ?? 100) ? styles.lowStock : styles.inStock}>
+                    {m.quantity < (m.minStock ?? 100) ? '⚠️ Low' : '✅ OK'}
                   </span>
                 </td>
                 <td style={styles.td}>
