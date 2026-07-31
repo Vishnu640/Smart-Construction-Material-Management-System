@@ -1,5 +1,5 @@
 [phases.build]
-cmds = ["mvn clean package -DskipTests -q"]
+cmds = ["mvn clean package -DskipTests"]
 
 [start]
 cmd = "java -jar target/management-1.0.0.jar"

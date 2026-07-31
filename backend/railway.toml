@@ -3,6 +3,4 @@ builder = "NIXPACKS"
 
 [deploy]
 restartPolicyType = "ON_FAILURE"
-restartPolicyMaxRetries = 10
-healthcheckPath = "/api/auth/login"
-healthcheckTimeout = 300
+restartPolicyMaxRetries = 5
