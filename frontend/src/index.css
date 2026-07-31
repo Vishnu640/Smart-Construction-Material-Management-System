@@ -251,3 +251,14 @@ button:hover { opacity: 0.88; transition: opacity 0.2s; }
   .sidebar, .mobile-topbar { display: none !important; }
   .main-content { margin-left: 0 !important; padding: 0 !important; }
 }
+
+/* ─── Login Spinner ──────────────────────────────────────── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Login Page Mobile ──────────────────────────────────── */
+@media (max-width: 768px) {
+  .login-left { display: none !important; }
+  .login-right { width: 100% !important; }
+}
