@@ -37,33 +37,32 @@ public class DataInitializer implements CommandLineRunner {
 
     private void seedMaterials() {
         if (materialRepository.count() > 0) return;
-        Object[][] data = {
-            {"Cement (OPC 53)",     "Binding",   1200, 8.50,  "UltraTech Cement",   200},
-            {"Steel Bars (TMT 12mm)","Steel",    850,  55.00, "TATA Steel",         150},
-            {"River Sand",          "Aggregate", 600,  12.00, "Local Quarry",       100},
-            {"Crushed Stone (20mm)","Aggregate", 750,  10.00, "Granite Suppliers",  120},
-            {"Red Bricks",          "Masonry",   5000, 0.45,  "City Brick Works",   800},
-            {"AAC Blocks",          "Masonry",   3200, 1.20,  "Siporex India",      500},
-            {"Plywood (18mm)",      "Wood",      180,  35.00, "Century Plyboards",  30},
-            {"Binding Wire",        "Steel",     90,   2.50,  "Wire Industries",    50},
-            {"PVC Pipes (4 inch)",  "Plumbing",  320,  18.00, "Finolex Pipes",      60},
-            {"Ceramic Tiles (2x2)","Finishing", 2400, 22.00, "Kajaria Ceramics",   400},
-            {"White Cement",        "Finishing", 150,  14.00, "JK White Cement",    80},
-            {"Waterproofing Compound","Chemical",95,  28.00, "Dr. Fixit",          40},
-            {"Electrical Conduit",  "Electrical",410,  6.50,  "Havells India",      80},
-            {"MS Channels (100mm)","Steel",     220,  72.00, "JSW Steel",          50},
-            {"Granite Slabs",       "Finishing", 180,  95.00, "Rajasthan Granites", 30},
-        };
-        for (Object[] row : data) {
-            Material m = new Material();
-            m.setMaterialName((String) row[0]);
-            m.setCategory((String) row[1]);
-            m.setQuantity((int) row[2]);
-            m.setPrice((double) row[3]);
-            m.setSupplier((String) row[4]);
-            m.setMinStock((int) row[5]);
-            materialRepository.save(m);
-        }
+        save("Cement (OPC 53)",          "Binding",    1200, 8.50,  "UltraTech Cement",   200);
+        save("Steel Bars (TMT 12mm)",    "Steel",       850, 55.00, "TATA Steel",         150);
+        save("River Sand",               "Aggregate",   600, 12.00, "Local Quarry",       100);
+        save("Crushed Stone (20mm)",     "Aggregate",   750, 10.00, "Granite Suppliers",  120);
+        save("Red Bricks",               "Masonry",    5000,  0.45, "City Brick Works",   800);
+        save("AAC Blocks",               "Masonry",    3200,  1.20, "Siporex India",      500);
+        save("Plywood (18mm)",           "Wood",        180, 35.00, "Century Plyboards",   30);
+        save("Binding Wire",             "Steel",        90,  2.50, "Wire Industries",     50);
+        save("PVC Pipes (4 inch)",       "Plumbing",    320, 18.00, "Finolex Pipes",       60);
+        save("Ceramic Tiles (2x2)",      "Finishing",  2400, 22.00, "Kajaria Ceramics",   400);
+        save("White Cement",             "Finishing",   150, 14.00, "JK White Cement",     80);
+        save("Waterproofing Compound",   "Chemical",     95, 28.00, "Dr. Fixit",           40);
+        save("Electrical Conduit",       "Electrical",  410,  6.50, "Havells India",       80);
+        save("MS Channels (100mm)",      "Steel",       220, 72.00, "JSW Steel",           50);
+        save("Granite Slabs",            "Finishing",   180, 95.00, "Rajasthan Granites",  30);
         System.out.println("Seeded 15 sample materials.");
+    }
+
+    private void save(String name, String category, int qty, double price, String supplier, int minStock) {
+        Material m = new Material();
+        m.setMaterialName(name);
+        m.setCategory(category);
+        m.setQuantity(qty);
+        m.setPrice(price);
+        m.setSupplier(supplier);
+        m.setMinStock(minStock);
+        materialRepository.save(m);
     }
 }
